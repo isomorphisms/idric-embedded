@@ -1,17 +1,21 @@
 # Idriç Steam target
 
-This branch treats Steam as a **platform target**, not as a new processor architecture.
+This branch treats Steam as a **platform target**, not as a new processor architecture or shader backend.
 
-The current Valve machines that matter here—the Steam Deck family and the 2026 Steam Machine—use AMD x86-64 CPUs. CPU instruction selection, register allocation, calling-convention lowering, and other x86-64 backend work therefore belong in [`isomorphisms/idric-x86-aggressive-backend`](https://github.com/isomorphisms/idric-x86-aggressive-backend), not in a Steam-specific instruction selector.
+## Ownership
 
-The point of keeping a `steam` branch anyway is that **ISA support is only one layer of a deployable program**.
+Compiler work is now deliberately split by layer:
+
+- **CPU / x86-64**: [`isomorphisms/idric-x86-aggressive-backend`](https://github.com/isomorphisms/idric-x86-aggressive-backend).
+- **Steam Deck GPU / RDNA2 + Vulkan/SPIR-V**: [`isomorphisms/idris-shader-backend:target/steam-rdna2-vulkan`](https://github.com/isomorphisms/idris-shader-backend/tree/target/steam-rdna2-vulkan).
+- **This branch**: SteamOS/Steam Linux Runtime, executable deployment, window/presentation/input/audio/filesystem/Steam integration, and the connection between host code and the shader backend.
+
+Do not maintain a second Vulkan GLSL/SPIR-V emitter here. The shader repository is the single compiler-facing home.
 
 ## Layers
 
-A useful way to read the target is:
-
 ```text
-Idriç program
+Idriç host program
     ↓
 x86-64 code generation
     ↓
@@ -19,48 +23,58 @@ Linux executable + process ABI
     ↓
 Steam Linux Runtime / SteamOS
     ↓
-window, input, audio, filesystem, timing, graphics APIs
+window, input, audio, filesystem, presentation
+
+Idriç shader subset
     ↓
-CPU + GPU hardware
+idris-shader-backend target/steam-rdna2-vulkan
+    ↓
+Vulkan GLSL → SPIR-V
+    ↓
+Vulkan driver
+    ↓
+Steam Deck RDNA2 GPU
 ```
 
 These layers should stay separate.
 
-- **ISA**: x86-64 / AMD64. The processor understands machine instructions such as loads, arithmetic, branches, calls, and SIMD instructions.
-- **calling convention and executable ABI**: tells generated code how arguments, return values, registers, stack frames, symbols, ELF objects, dynamic linking, and process startup fit together on a 64-bit Linux host.
-- **Steam Linux Runtime**: a binary-compatible user-space runtime used to make native Linux games behave predictably across Linux distributions. It is not an instruction set. Valve currently recommends Steam Linux Runtime 4.0 (`steamrt4`) for new native Linux games.
-- **SteamOS**: the Linux-based operating environment used by Deck and Steam Machine. It is not the compiler backend either.
-- **graphics/input/platform APIs**: Vulkan, controller input, audio, window/fullscreen behavior, filesystem locations, suspend/resume, Steam Input, Steamworks, and similar facilities sit above the CPU ABI.
-- **GPU ISA**: RDNA machine code is a separate problem again. An Idriç CPU backend should not grow RDNA instructions merely because the target machine has an AMD GPU.
-
-This separation is useful computer science in its own right: an architecture tells us what the processor can execute; an ABI tells independently compiled code how to cooperate; an operating-system/runtime boundary tells the executable what services exist; and a graphics API lets programs ask a driver to use hardware whose native instruction set may be entirely different.
+- **CPU ISA**: x86-64 / AMD64.
+- **calling convention and executable ABI**: arguments, returns, registers, stack, ELF, dynamic linking and process startup.
+- **Steam Linux Runtime / SteamOS**: deployment/runtime environment, not the compiler backend.
+- **shader compiler**: shared shader IR plus Vulkan GLSL/SPIR-V lowering in the shader repository.
+- **graphics API**: Vulkan resource, pipeline and command submission.
+- **GPU ISA**: RDNA2 machine code, separately documented in the shader target branch.
+- **Steam platform APIs**: controller/input, Steamworks and related services remain platform work rather than shader semantics.
 
 ## First concrete deployment boundary
 
 For a first reproducible Steam target, prefer:
 
-1. native **x86-64 Linux** rather than trying to solve Windows/Proton and native Linux simultaneously;
-2. the existing x86-64 backend as the owner of CPU code generation;
+1. native **x86-64 Linux** rather than solving Windows/Proton and native Linux simultaneously;
+2. the existing x86-64 backend as owner of CPU code generation;
 3. an ordinary ELF executable with a deliberately small Linux ABI surface;
-4. the current Steam Linux Runtime as the deployment environment;
-5. one deterministic frame and one controller/keyboard input as the first visible platform proof;
-6. Steamworks-specific features only after ordinary launch, rendering, input, and exit work.
+4. the current Steam Linux Runtime as deployment environment;
+5. generated Vulkan/SPIR-V shader work from `target/steam-rdna2-vulkan`;
+6. one deterministic frame and one controller/keyboard input as the first visible platform proof;
+7. Steamworks-specific features only after ordinary launch, rendering, input and exit work.
 
-A useful first oracle is therefore not "use Steam." It is: **compile one Idriç function through the x86-64 backend, link it into a minimal native Linux executable, run it under the pinned Steam runtime, and observe a deterministic result.** Then add graphics and input without changing the CPU backend contract.
+The CPU oracle and GPU oracle remain independently testable. A host program should still be provable without Vulkan, and a generated shader should still be compilable/validated without requiring Steam distribution machinery.
 
-## Related repositories and notes
+## GPU target precision
 
-- CPU backend: [`isomorphisms/idric-x86-aggressive-backend`](https://github.com/isomorphisms/idric-x86-aggressive-backend)
-- Compiler/language: [`isomorphisms/Idric`](https://github.com/isomorphisms/Idric)
-- Existing numerical shader work: [`isomorphisms/idris-shader-backend`](https://github.com/isomorphisms/idris-shader-backend). It currently emits GLSL ES 3.00, so it is conceptual/reusable shader work rather than an already-finished Vulkan/SPIR-V Steam path.
-- Steam deployment issue in this repository: [#6](https://github.com/isomorphisms/idric-embedded/issues/6)
+The shader branch is pinned to the Steam Deck's AMD RDNA2 GPU rather than treating every machine running Steam as one GPU architecture. A future Steam machine with a materially different GPU should either use another existing shader target or get its own target branch. “Steam” itself is never the GPU ISA.
+
+## Related
+
+- centralized Steam Deck shader target: [`idris-shader-backend/target/steam-rdna2-vulkan`](https://github.com/isomorphisms/idris-shader-backend/tree/target/steam-rdna2-vulkan)
+- CPU backend: [`idric-x86-aggressive-backend`](https://github.com/isomorphisms/idric-x86-aggressive-backend)
+- compiler/language: [`Idric`](https://github.com/isomorphisms/Idric)
+- Steam deployment issue: [#6](https://github.com/isomorphisms/idric-embedded/issues/6)
 - Valve Steam Runtime reference: <https://github.com/ValveSoftware/steam-runtime>
 - Steam Deck hardware reference: <https://www.steamdeck.com/en/tech>
 
 ## Scope rule
 
-Keep this branch even though it does not own a new CPU ISA. Its job is to answer a different question:
+Keep this branch even though it owns neither CPU nor shader instruction selection. Its job is:
 
-> Given that Idriç can already produce code for the host processor, what additional contracts are required to turn that code into a reproducibly runnable Steam game?
-
-That same distinction should be reusable when comparing Steam, Android, Switch, ordinary desktop Linux, and later deployment targets.
+> Given correct Idriç-generated x86-64 host code and correct generated Vulkan/SPIR-V shader code, what additional contracts are required to turn them into a reproducibly runnable Steam program?
