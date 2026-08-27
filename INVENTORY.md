@@ -36,18 +36,18 @@ Do not call portable shader-language operations native GPU opcodes.
 
 | Branch | Target boundary |
 | --- | --- |
-| `atmega` | AVR instruction-set variants applicable to the pinned ATmega family/device |
-| `attiny` | AVR instruction-set variants applicable to the pinned ATtiny family/device; reduced-core and AVRxt differences must remain explicit |
-| `ch552` | WCH CH552 enhanced 8051-compatible CPU; WCH-specific differences must be separated from base MCS-51 |
-| `esp` | Must pin the ESP chip: classic ESP32 is Xtensa LX6; later ESP32 family members use different Xtensa and RISC-V cores |
-| `game-boy` | Sharp SM83 / LR35902-compatible Game Boy CPU instruction set |
-| `msp430` | MSP430/MSP430X as applicable to the pinned device |
-| `rp2040` | Armv6-M Thumb on Cortex-M0+ **and** the RP2040 PIO instruction set |
-| `rp4080` | Unresolved target name: no current Raspberry Pi MCU named RP4080; do not invent an ISA |
-| `steam` | Deployment product, not an ISA; pin concrete host CPU target(s), initially x86-64 if Steam Deck/PC-class hardware is intended |
-| `switch` | Nintendo Switch CPU architecture boundary must be pinned separately from platform/GPU/runtime work |
-| `tricore-aurix` | Pin the AURIX generation and corresponding TriCore ISA level rather than treating AURIX as one invariant ISA |
-| `wasm` | WebAssembly Core Specification 3.0 |
-| `webgpu` | WGSL language + WebGPU API/command/resource surface, not a fictional WebGPU machine ISA |
+| `atmega` | Complete 8-bit AVR instruction-name union, with AVR/AVRe/AVRxm/AVRxt/AVRrc and concrete-device availability kept explicit |
+| `attiny` | Complete 8-bit AVR union, explicitly retaining reduced-core and AVRxt differences rather than assuming one ATtiny core |
+| `ch552` | Complete MCS-51-compatible form surface plus the documented CH55x `0xA5` DPTR1 XRAM operation |
+| `esp` | Separate Xtensa LX6/LX7 and RISC-V architecture inventories with per-chip configuration/extension filtering; no fictional single ESP ISA |
+| `game-boy` | Complete Sharp SM83 / LR35902-compatible opcode space, including invalid base opcodes and all CB-prefixed operations |
+| `msp430` | Complete MSP430/MSP430X real and documented emulated instruction surfaces, with core generation retained |
+| `rp2040` | Complete Armv6-M Thumb Cortex-M0+ surface **and** the separate RP2040 PIO-v0 ISA |
+| `rp4080` | Unresolved target name: no current Raspberry Pi MCU named RP4080; branch records the blocker instead of inventing an ISA |
+| `steam` | First concrete deployment profile pinned to Steam Deck / SteamOS AMD64; complete x86-64 catalog is shared from `idric-big-iron` and filtered by Deck features |
+| `switch` | Original Switch family pinned to Tegra X1 / Armv8-A A64 Cortex-A57/A53 profile; GPU/shader work remains a separate architecture boundary |
+| `tricore-aurix` | Separate complete AURIX TC3xx / TriCore TC1.6.2P and TC4xx / TriCore TC1.8 inventories |
+| `wasm` | Complete WebAssembly Core Specification 3.0 instruction table generated from the specification's own canonical instruction index source |
+| `webgpu` | Complete pinned WGSL grammar/language and WebGPU API/command/resource surface; no fictional WebGPU machine ISA |
 
 If a branch name is broader than a single ISA, completeness requires either pinning a concrete member or explicitly maintaining multiple inventories. Ambiguity is a blocker to declaring the inventory complete, not a reason to guess.
